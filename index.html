@@ -66,9 +66,10 @@
             </div>
             
             <!-- Main Tabs -->
-            <div class="flex justify-around text-sm font-semibold border-t border-blue-500/30 dark:border-slate-700 pt-2">
+            <div class="flex justify-around text-xs sm:text-sm font-semibold border-t border-blue-500/30 dark:border-slate-700 pt-2">
                 <button onclick="setMainTab('grammar')" id="tab-grammar" class="pb-1 border-b-2 border-white">문법 파트</button>
                 <button onclick="setMainTab('conversation')" id="tab-conversation" class="pb-1 border-b-2 border-transparent opacity-70">회화 파트</button>
+                <button onclick="setMainTab('words')" id="tab-words" class="pb-1 border-b-2 border-transparent opacity-70">단어 파트</button>
                 <button onclick="setMainTab('bookmarks')" id="tab-bookmarks" class="pb-1 border-b-2 border-transparent opacity-70">⭐ 복습장</button>
             </div>
         </header>
@@ -124,10 +125,9 @@
                         <i class="fa-solid fa-hand-pointer mr-1"></i>카드 터치하여 정답 열기/닫기 | <i class="fa-solid fa-arrows-left-right mr-1"></i>좌우 드래그 스와이프
                     </p>
                     
-                    <!-- 전체 터치 및 스와이프 감지 영역 -->
                     <div id="card-touch-area" class="w-full min-h-[340px] bg-white dark:bg-slate-700/90 border-2 border-blue-100 dark:border-slate-600 rounded-2xl p-6 shadow-lg flex flex-col justify-between cursor-grab active:cursor-grabbing">
                         
-                        <!-- 1. 터치/스와이프 반응 본문 영역 (한국어, 태그, 영어, 설명 통합) -->
+                        <!-- 1. 터치/스와이프 반응 본문 영역 (한국어, 태그, 영어, 설명) -->
                         <div id="card-content-body" class="flex-1 flex flex-col justify-between">
                             <!-- Top Tag -->
                             <div class="flex justify-between items-center">
@@ -146,7 +146,7 @@
                                 </h3>
                             </div>
 
-                            <!-- Reveal Target: English & Explanation Section (터치/스와이프 전면 지원) -->
+                            <!-- Reveal Target: English & Explanation Section -->
                             <div id="reveal-section" class="hidden border-t-2 border-dashed border-blue-100 dark:border-slate-600 pt-4 mt-2 text-center space-y-3">
                                 <div>
                                     <span class="text-[10px] font-bold text-blue-500 uppercase tracking-wider block mb-1">English</span>
@@ -161,7 +161,7 @@
                             </div>
                         </div>
 
-                        <!-- 2. 독립된 하단 액션 바 영역 (터치 및 스와이프 간섭 100% 차단) -->
+                        <!-- 2. 독립된 하단 액션 바 영역 -->
                         <div id="card-action-bar" class="hidden border-t border-gray-100 dark:border-slate-600/60 pt-3 mt-3">
                             <div class="flex space-x-3 w-full justify-center">
                                 <button onclick="speakText()" class="flex-1 max-w-[130px] bg-blue-50 dark:bg-slate-800 hover:bg-blue-100 text-blue-600 dark:text-blue-300 text-xs py-2 px-3 rounded-full font-bold flex items-center justify-center space-x-1.5 transition active:scale-95 border border-blue-200 dark:border-slate-600">
@@ -206,7 +206,8 @@
             ],
             conversation: [
                 "회화(공항에서)", "회화(택시에서)", "회화(식당에서)", "회화(영행지에서)", "회화(대중교통)", "회화(길찾기)"
-            ]
+            ],
+            words: ["매일 단어장"]
         };
 
         let currentTab = localStorage.getItem('app_last_tab') || 'grammar';
@@ -230,6 +231,10 @@
                 if (currentView === 'flashcard' && bookmarks.length > 0) {
                     startFlashcard(getSavedCardIndex());
                 }
+            } else if (currentTab === 'words') {
+                document.getElementById('sub-tabs-container').classList.add('hidden');
+                currentSubTab = '단어';
+                loadSheetData('단어', true);
             } else {
                 renderSubTabs();
                 loadSheetData(currentSubTab, true);
@@ -262,6 +267,7 @@
         function updateTabHeaderUI() {
             document.getElementById('tab-grammar').className = `pb-1 border-b-2 ${currentTab === 'grammar' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
             document.getElementById('tab-conversation').className = `pb-1 border-b-2 ${currentTab === 'conversation' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
+            document.getElementById('tab-words').className = `pb-1 border-b-2 ${currentTab === 'words' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
             document.getElementById('tab-bookmarks').className = `pb-1 border-b-2 ${currentTab === 'bookmarks' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
         }
 
@@ -277,6 +283,11 @@
                 subNav.classList.add('hidden');
                 document.getElementById('current-category-title').innerText = '복습장 (저장된 예문)';
                 renderList(bookmarks, true);
+            } else if (tab === 'words') {
+                subNav.classList.add('hidden');
+                currentSubTab = '단어';
+                localStorage.setItem('app_last_subtab', '단어');
+                loadSheetData('단어');
             } else {
                 subNav.classList.remove('hidden');
                 const savedSub = localStorage.getItem(`app_last_subtab_${tab}`);
@@ -310,7 +321,7 @@
         async function loadSheetData(sheetName, isInitialLoad = false) {
             const listContainer = document.getElementById('list-container');
             listContainer.innerHTML = '<div class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p class="text-xs">데이터를 가져오는 중입니다...</p></div>';
-            document.getElementById('current-category-title').innerText = sheetName;
+            document.getElementById('current-category-title').innerText = sheetName === '단어' ? '매일 자동 생성 단어장' : sheetName;
             
             const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
             
@@ -353,8 +364,8 @@
             }
 
             return arr.map(row => {
-                if(currentTab === 'grammar') {
-                    return { ko: row[0] || '', form: row[1] || '', en: row[2] || '', note: row[3] || '', category: currentSubTab };
+                if(currentTab === 'grammar' || currentTab === 'words') {
+                    return { ko: row[0] || '', form: row[1] || '', en: row[2] || '', note: row[3] || '', category: currentTab === 'words' ? '단어' : currentSubTab };
                 } else {
                     return { ko: row[0] || '', form: '', en: row[1] || '', note: row[2] || '', category: currentSubTab };
                 }
@@ -365,7 +376,7 @@
         function renderList(data, isBookmark = false) {
             currentData = data;
             const container = document.getElementById('list-container');
-            document.getElementById('item-count-label').innerText = `${data.length}개의 예문`;
+            document.getElementById('item-count-label').innerText = `${data.length}개의 예문/단어`;
 
             if(data.length === 0) {
                 container.innerHTML = `<div class="text-center text-gray-400 py-16 text-xs"><i class="fa-regular fa-folder-open text-3xl mb-2"></i><p>${isBookmark ? '저장된 복습 카드가 없습니다.' : '등록된 예문이 없습니다.'}</p></div>`;
@@ -566,7 +577,7 @@
             }
         }
 
-        /* --- Pointer Events (Touch & Drag handling with strict Action Bar Exclusion) --- */
+        /* --- Pointer Events --- */
         function setupSwipeEvents() {
             const cardBox = document.getElementById('card-touch-area');
             let startX = 0;
@@ -578,7 +589,6 @@
             cardBox.addEventListener('pointerdown', (e) => {
                 if (isAnimating) return;
 
-                // 하단 액션 바 영역(#card-action-bar)이나 버튼 터치 시 드래그 및 정답 토글 완전 무시
                 if (e.target.closest('#card-action-bar') || e.target.closest('button')) {
                     isDragging = false;
                     return;
@@ -617,7 +627,6 @@
 
                 const SWIPE_THRESHOLD = 50;
 
-                // 1. 단순 터치/클릭 (카드의 모든 본문 영역 - 한국어, 영어, 설명 어디든 정답 토글)
                 if (Math.abs(deltaX) < 8 && Math.abs(deltaY) < 8) {
                     cardBox.style.transition = 'transform 0.2s ease-out';
                     cardBox.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
@@ -625,16 +634,11 @@
                     return;
                 }
 
-                // 2. 왼쪽 스와이프 (다음 카드)
                 if (deltaX < -SWIPE_THRESHOLD) {
                     executeSwipeAnimation('next', deltaY);
-                }
-                // 3. 오른쪽 스와이프 (이전 카드)
-                else if (deltaX > SWIPE_THRESHOLD) {
+                } else if (deltaX > SWIPE_THRESHOLD) {
                     executeSwipeAnimation('prev', deltaY);
-                }
-                // 4. Snap-back (복원)
-                else {
+                } else {
                     cardBox.style.transition = 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1)';
                     cardBox.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
                 }
@@ -644,7 +648,6 @@
             cardBox.addEventListener('pointercancel', handlePointerEnd);
         }
 
-        /* 스와이프 애니메이션 및 카드 전환 */
         function executeSwipeAnimation(direction, deltaY = 0) {
             if (isAnimating) return;
             isAnimating = true;
