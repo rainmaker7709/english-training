@@ -43,11 +43,6 @@
         ::-webkit-scrollbar { display: none; }
         * { -ms-overflow-style: none; scrollbar-width: none; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-        
-        /* Card Transform Transition for Snap-back & Animations */
-        .card-anim-ready {
-            transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease-out;
-        }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-slate-900 text-gray-800 dark:text-gray-100 min-h-full transition-colors duration-200">
@@ -122,7 +117,7 @@
                         <i class="fa-solid fa-hand-pointer mr-1"></i>상단 영역 터치하여 정답 열기 | <i class="fa-solid fa-arrows-left-right mr-1"></i>좌우 드래그 스와이프
                     </p>
                     
-                    <div id="card-touch-area" class="w-full min-h-[340px] bg-white dark:bg-slate-700/90 border-2 border-blue-100 dark:border-slate-600 rounded-2xl p-6 shadow-lg flex flex-col justify-between cursor-pointer card-anim-ready">
+                    <div id="card-touch-area" class="w-full min-h-[340px] bg-white dark:bg-slate-700/90 border-2 border-blue-100 dark:border-slate-600 rounded-2xl p-6 shadow-lg flex flex-col justify-between cursor-pointer">
                         
                         <!-- Top Area (Touch Area for Toggle) -->
                         <div class="flex-1 flex flex-col justify-between" id="card-top-section">
@@ -144,7 +139,7 @@
                             </div>
                         </div>
 
-                        <!-- Reveal Target: English & Explanation Section (Excluded from Touch Reveal Toggle) -->
+                        <!-- Reveal Target: English & Explanation Section -->
                         <div id="reveal-section" class="hidden border-t-2 border-dashed border-blue-100 dark:border-slate-600 pt-4 mt-2 text-center space-y-3">
                             <div>
                                 <span class="text-[10px] font-bold text-blue-500 uppercase tracking-wider block mb-1">English</span>
@@ -204,10 +199,9 @@
             ]
         };
 
-        // 앱 상태 변수 (상태 복원을 위해 로컬스토리지 연동)
         let currentTab = localStorage.getItem('app_last_tab') || 'grammar';
         let currentSubTab = localStorage.getItem('app_last_subtab') || categories.grammar[0];
-        let currentView = localStorage.getItem('app_last_view') || 'list'; // 'list' | 'flashcard'
+        let currentView = localStorage.getItem('app_last_view') || 'list';
         
         let currentData = [];
         let cardIndex = 0;
@@ -217,8 +211,6 @@
 
         window.onload = () => {
             initDarkMode();
-            
-            // 저장된 탭 상태 반영 UI 세팅
             updateTabHeaderUI();
             
             if (currentTab === 'bookmarks') {
@@ -319,7 +311,6 @@
                 
                 renderList(currentData);
 
-                // 새로고침 시 이전에 플래시카드 화면이었다면 해당 위치로 카드뷰 복원
                 if (isInitialLoad && currentView === 'flashcard' && currentData.length > 0) {
                     startFlashcard(getSavedCardIndex());
                 }
@@ -402,7 +393,7 @@
             renderList(currentData, currentTab === 'bookmarks');
         }
 
-        /* --- Flashcard Progress Persistence Helpers --- */
+        /* --- Flashcard Progress Persistence --- */
         function saveProgress() {
             const progressKey = `progress_${currentTab}_${currentSubTab}`;
             localStorage.setItem(progressKey, cardIndex);
@@ -470,27 +461,34 @@
             }
         }
 
-        function nextCard() {
-            if (isAnimating) return;
-            if(cardIndex < currentData.length - 1) {
-                cardIndex++;
-            } else {
-                alert('마지막 카드입니다. 첫 카드부터 다시 학습합니다.');
-                cardIndex = 0;
+        /* 실제 카드 데이터 변경 핵심 메서드 */
+        function changeCardIndex(direction) {
+            if (direction === 'next') {
+                if (cardIndex < currentData.length - 1) {
+                    cardIndex++;
+                } else {
+                    alert('마지막 카드입니다. 첫 카드부터 다시 학습합니다.');
+                    cardIndex = 0;
+                }
+            } else if (direction === 'prev') {
+                if (cardIndex > 0) {
+                    cardIndex--;
+                }
             }
             saveProgress();
             isRevealed = false;
             updateCardUI();
         }
 
+        /* 하단 버튼용 다음/이전 메서드 */
+        function nextCard() {
+            if (isAnimating) return;
+            changeCardIndex('next');
+        }
+
         function prevCard() {
             if (isAnimating) return;
-            if(cardIndex > 0) {
-                cardIndex--;
-                saveProgress();
-                isRevealed = false;
-                updateCardUI();
-            }
+            changeCardIndex('prev');
         }
 
         function updateCardUI() {
@@ -554,7 +552,7 @@
             }
         }
 
-        /* --- Real-Time Touch Drag & Gesture (Strict #reveal-section Exclusion) --- */
+        /* --- Real-Time Drag & Fluid Swipe Transition Logic --- */
         function setupSwipeEvents() {
             const cardBox = document.getElementById('card-touch-area');
             let startX = 0;
@@ -563,11 +561,10 @@
             let deltaY = 0;
             let isDragging = false;
 
-            // 터치 시작
             cardBox.addEventListener('touchstart', (e) => {
                 if (isAnimating) return;
 
-                // 버튼이나 #reveal-section 내부를 터치한 경우 터치/드래그 무시
+                // 정답 영역(#reveal-section) 또는 버튼 클릭 시 터치/드래그 제외
                 if (e.target.closest('#reveal-section') || e.target.closest('button')) {
                     isDragging = false;
                     return;
@@ -580,11 +577,9 @@
                 deltaX = 0;
                 deltaY = 0;
 
-                // 드래그 중 실시간 추적을 위해 트랜지션 해제
                 cardBox.style.transition = 'none';
             }, { passive: true });
 
-            // 손가락 이동 (실시간 추적)
             cardBox.addEventListener('touchmove', (e) => {
                 if (!isDragging) return;
 
@@ -592,66 +587,86 @@
                 deltaX = touch.clientX - startX;
                 deltaY = touch.clientY - startY;
 
-                // 실시간 위치 이동 및 기울기(Rotate) 효과
-                const rotate = deltaX * 0.05; // 픽셀당 약 0.05도 회전
+                // 손가락 움직임 추적 및 회전 효과
+                const rotate = deltaX * 0.05;
                 cardBox.style.transform = `translate3d(${deltaX}px, ${deltaY * 0.15}px, 0) rotate(${rotate}deg)`;
             }, { passive: true });
 
-            // 터치 종료 (스와이프 / 탄력 복원 / 정답 열기 판정)
-            cardBox.addEventListener('touchend', (e) => {
+            cardBox.addEventListener('touchend', () => {
                 if (!isDragging) return;
                 isDragging = false;
 
-                // 탄력 복원 애니메이션 준비
-                cardBox.style.transition = 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease-out';
-
                 const SWIPE_THRESHOLD = 80;
 
-                // 1. 단순 터치(클릭)인 경우: 상단 영역 터치 시에만 정답 토글
+                // 1. 단순 터치 시: 상단 영역일 경우 정답 열기
                 if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
+                    cardBox.style.transition = 'transform 0.2s ease-out';
                     cardBox.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
                     toggleReveal();
                     return;
                 }
 
-                // 2. 일정 거리(80px) 이상 스와이프한 경우
+                // 2. 왼쪽으로 스와이프 (다음 카드)
                 if (deltaX < -SWIPE_THRESHOLD) {
-                    // 왼쪽으로 끌기 (다음 카드)
                     isAnimating = true;
+                    cardBox.style.transition = 'transform 0.2s ease-in, opacity 0.2s ease-in';
                     cardBox.style.transform = `translate3d(-120%, ${deltaY}px, 0) rotate(-15deg)`;
                     cardBox.style.opacity = '0';
 
                     setTimeout(() => {
-                        nextCard();
-                        resetCardPosition(cardBox);
+                        // 카드 데이터 변경
+                        changeCardIndex('next');
+
+                        // 다음 카드가 반대쪽(우측)에서 들어오는 준비
+                        cardBox.style.transition = 'none';
+                        cardBox.style.transform = 'translate3d(40px, 0, 0) scale(0.95)';
+                        cardBox.style.opacity = '0';
+
+                        // 브라우저 리플로우 강제 후 진입 애니메이션 적용
+                        void cardBox.offsetWidth;
+
+                        cardBox.style.transition = 'transform 0.2s ease-out, opacity 0.2s ease-out';
+                        cardBox.style.transform = 'translate3d(0, 0, 0) scale(1)';
+                        cardBox.style.opacity = '1';
+
+                        setTimeout(() => {
+                            isAnimating = false;
+                        }, 200);
                     }, 200);
 
+                // 3. 오른쪽으로 스와이프 (이전 카드)
                 } else if (deltaX > SWIPE_THRESHOLD) {
-                    // 오른쪽으로 끌기 (이전 카드)
                     isAnimating = true;
+                    cardBox.style.transition = 'transform 0.2s ease-in, opacity 0.2s ease-in';
                     cardBox.style.transform = `translate3d(120%, ${deltaY}px, 0) rotate(15deg)`;
                     cardBox.style.opacity = '0';
 
                     setTimeout(() => {
-                        prevCard();
-                        resetCardPosition(cardBox);
+                        // 카드 데이터 변경
+                        changeCardIndex('prev');
+
+                        // 이전 카드가 반대쪽(좌측)에서 들어오는 준비
+                        cardBox.style.transition = 'none';
+                        cardBox.style.transform = 'translate3d(-40px, 0, 0) scale(0.95)';
+                        cardBox.style.opacity = '0';
+
+                        void cardBox.offsetWidth;
+
+                        cardBox.style.transition = 'transform 0.2s ease-out, opacity 0.2s ease-out';
+                        cardBox.style.transform = 'translate3d(0, 0, 0) scale(1)';
+                        cardBox.style.opacity = '1';
+
+                        setTimeout(() => {
+                            isAnimating = false;
+                        }, 200);
                     }, 200);
 
+                // 4. 임계값 미만 끌기 (Snap-back 탄력 복원)
                 } else {
-                    // 3. 80px 미만으로 살짝 밀었을 때: 제자리로 탄력 복원 (Snap-back)
+                    cardBox.style.transition = 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1)';
                     cardBox.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
                 }
             });
-
-            function resetCardPosition(element) {
-                element.style.transition = 'none';
-                element.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
-                element.style.opacity = '1';
-                setTimeout(() => {
-                    element.style.transition = 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease-out';
-                    isAnimating = false;
-                }, 50);
-            }
         }
     </script>
 
