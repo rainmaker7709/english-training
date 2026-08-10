@@ -319,26 +319,27 @@
 
         /* --- Data Fetching --- */
         async function loadSheetData(sheetName, isInitialLoad = false) {
-            const listContainer = document.getElementById('list-container');
-            listContainer.innerHTML = '<div class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p class="text-xs">데이터를 가져오는 중입니다...</p></div>';
-            document.getElementById('current-category-title').innerText = sheetName === '단어' ? '매일 자동 생성 단어장' : sheetName;
-            
-            const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-            
-            try {
-                const response = await fetch(url);
-                const csvText = await response.text();
-                currentData = parseCSV(csvText);
-                
-                renderList(currentData);
+    const listContainer = document.getElementById('list-container');
+    listContainer.innerHTML = '<div class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p class="text-xs">데이터를 가져오는 중입니다...</p></div>';
+    document.getElementById('current-category-title').innerText = sheetName === '단어' ? '매일 자동 생성 단어장' : sheetName;
+    
+    // 캐시 방지를 위해 타임스탬프 파라미터 추가
+    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&_t=${Date.now()}`;
+    
+    try {
+        const response = await fetch(url);
+        const csvText = await response.text();
+        currentData = parseCSV(csvText);
+        
+        renderList(currentData);
 
-                if (isInitialLoad && currentView === 'flashcard' && currentData.length > 0) {
-                    startFlashcard(getSavedCardIndex());
-                }
-            } catch (error) {
-                listContainer.innerHTML = '<div class="text-center py-10 text-red-500 text-xs px-4"><i class="fa-solid fa-triangle-exclamation text-xl mb-2"></i><p>시트 데이터를 가져오지 못했습니다. 구글시트의 공유 설정("링크가 있는 모든 사용자 읽기 가능")을 확인해 주세요.</p></div>';
-            }
+        if (isInitialLoad && currentView === 'flashcard' && currentData.length > 0) {
+            startFlashcard(getSavedCardIndex());
         }
+    } catch (error) {
+        listContainer.innerHTML = '<div class="text-center py-10 text-red-500 text-xs px-4"><i class="fa-solid fa-triangle-exclamation text-xl mb-2"></i><p>시트 데이터를 가져오지 못했습니다. 구글시트의 공유 설정("링크가 있는 모든 사용자 읽기 가능")을 확인해 주세요.</p></div>';
+    }
+}
 
         function parseCSV(str) {
             const arr = [];
