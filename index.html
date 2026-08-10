@@ -5,13 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>My English Master</title>
     
-    <!-- PWA Meta Tags for Web App installation -->
+    <!-- PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="EngMaster">
     <meta name="theme-color" content="#2563eb">
 
-    <!-- 👇 이 2줄을 추가해 주세요 👇 -->
     <link rel="icon" type="image/png" sizes="192x192" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="manifest" href="manifest.json">
@@ -45,12 +44,26 @@
         * { -ms-overflow-style: none; scrollbar-width: none; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
         
-        /* 3D Flip Card Animation */
-        .perspective-1000 { perspective: 1000px; }
-        .transform-style-3d { transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
-        .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-        .flip-card-back { transform: rotateY(180deg); }
-        .is-flipped { transform: rotateY(180deg); }
+        /* Slide Animation for Flashcard Swipe */
+        .card-anim {
+            transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+        }
+        .slide-out-left {
+            transform: translateX(-100%) scale(0.95);
+            opacity: 0;
+        }
+        .slide-out-right {
+            transform: translateX(100%) scale(0.95);
+            opacity: 0;
+        }
+        .slide-in-left {
+            transform: translateX(-100%) scale(0.95);
+            opacity: 0;
+        }
+        .slide-in-right {
+            transform: translateX(100%) scale(0.95);
+            opacity: 0;
+        }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-slate-900 text-gray-800 dark:text-gray-100 min-h-full transition-colors duration-200">
@@ -59,9 +72,8 @@
         <!-- Header -->
         <header class="bg-blue-600 dark:bg-slate-900 text-white p-4 sticky top-0 z-20 shadow-md">
             <div class="flex justify-between items-center mb-3">
-                <div class="w-8"></div> <!-- Spacer for center alignment -->
+                <div class="w-8"></div>
                 <h1 class="text-xl font-bold tracking-tight">My English Master</h1>
-                <!-- Dark Mode Toggle Button -->
                 <button onclick="toggleDarkMode()" class="w-8 h-8 rounded-full bg-blue-700 dark:bg-slate-700 flex items-center justify-center text-amber-300 dark:text-amber-400 focus:outline-none" aria-label="Toggle Dark Mode">
                     <i id="dark-icon" class="fa-solid fa-moon text-sm"></i>
                 </button>
@@ -92,7 +104,7 @@
                         <h2 id="current-category-title" class="text-base font-bold text-gray-800 dark:text-gray-100">카테고리</h2>
                         <p id="item-count-label" class="text-xs text-gray-500 dark:text-gray-400">0개의 예문</p>
                     </div>
-                    <button onclick="startFlashcard()" class="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 text-white px-4 py-2 rounded-full font-bold text-sm shadow-md active:scale-95 transition flex items-center space-x-1">
+                    <button onclick="startFlashcard(0)" class="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 text-white px-4 py-2 rounded-full font-bold text-sm shadow-md active:scale-95 transition flex items-center space-x-1">
                         <i class="fa-solid fa-play text-xs"></i>
                         <span>카드 학습</span>
                     </button>
@@ -103,7 +115,7 @@
                 </div>
             </div>
 
-            <!-- Flashcard View Mode (Hidden initially) -->
+            <!-- Flashcard View Mode -->
             <div id="flashcard-view" class="hidden flex-1 flex-col justify-between py-2">
                 
                 <!-- Flashcard Top Control Bar -->
@@ -120,62 +132,57 @@
                     </div>
                 </div>
 
-                <!-- Flashcard Container (Swipe & Flip) -->
-                <div class="flex-1 flex flex-col justify-center my-auto">
+                <!-- Card Container (Touch to Reveal / Swipe Slide) -->
+                <div class="flex-1 flex flex-col justify-center my-auto relative overflow-hidden p-1">
                     <p class="text-center text-xs text-gray-400 dark:text-gray-500 mb-2">
-                        <i class="fa-solid fa-hand-pointer mr-1"></i>터치하여 뒤집기 | <i class="fa-solid fa-arrows-left-right mr-1"></i>좌우로 스와이프
+                        <i class="fa-solid fa-hand-pointer mr-1"></i>터치하여 정답 열기 | <i class="fa-solid fa-arrows-left-right mr-1"></i>좌우로 스와이프
                     </p>
                     
-                    <div class="perspective-1000 w-full h-80 relative" id="card-touch-area">
-                        <div id="card-inner" class="w-full h-full transform-style-3d shadow-xl rounded-2xl cursor-pointer">
-                            
-                            <!-- Front Side (Korean + Grammar Form) -->
-                            <div class="absolute w-full h-full backface-hidden bg-white dark:bg-slate-700 border-2 border-blue-100 dark:border-slate-600 rounded-2xl p-6 flex flex-col justify-between items-center text-center">
-                                <div id="card-front-tag" class="text-xs font-bold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-slate-800 px-3 py-1 rounded-full border border-blue-100 dark:border-slate-600">
-                                    문법/카테고리
-                                </div>
-                                
-                                <div class="my-auto px-2">
-                                    <h3 class="text-xl font-bold text-gray-800 dark:text-white leading-relaxed break-keep" id="card-front-ko">
-                                        한국어 문장이 표시됩니다.
-                                    </h3>
-                                </div>
-                                
-                                <span class="text-xs text-gray-400 dark:text-gray-400 animate-pulse">
-                                    터치해서 영어 문장 확인
-                                </span>
-                            </div>
-
-                            <!-- Back Side (English + Notes) -->
-                            <div class="absolute w-full h-full backface-hidden flip-card-back bg-blue-600 dark:bg-slate-900 rounded-2xl p-6 flex flex-col justify-between items-center text-center text-white border-2 border-blue-500 dark:border-slate-700">
-                                <div class="text-xs font-semibold text-blue-200 dark:text-slate-400 uppercase tracking-wider">
-                                    English
-                                </div>
-
-                                <div class="my-auto px-2 space-y-3">
-                                    <h3 class="text-xl font-bold text-white leading-relaxed break-words" id="card-back-en">
-                                        English sentence goes here.
-                                    </h3>
-                                    <div class="w-12 h-0.5 bg-blue-300/40 dark:bg-slate-600 mx-auto"></div>
-                                    <p class="text-xs text-blue-100 dark:text-slate-300 break-keep font-normal leading-normal max-h-24 overflow-y-auto" id="card-back-note">
-                                        설명 및 참고사항이 기재됩니다.
-                                    </p>
-                                </div>
-
-                                <!-- Back Card Action Buttons -->
-                                <div class="flex space-x-3 w-full justify-center pt-2">
-                                    <button onclick="event.stopPropagation(); speakText()" class="flex-1 max-w-[120px] bg-white/20 dark:bg-slate-800/80 hover:bg-white/30 text-white text-xs py-2 px-3 rounded-full flex items-center justify-center space-x-1.5 transition active:scale-95">
-                                        <i class="fa-solid fa-volume-high"></i>
-                                        <span>발음 듣기</span>
-                                    </button>
-                                    <button onclick="event.stopPropagation(); toggleBookmark()" id="btn-bookmark" class="flex-1 max-w-[120px] bg-white/20 dark:bg-slate-800/80 hover:bg-white/30 text-white text-xs py-2 px-3 rounded-full flex items-center justify-center space-x-1.5 transition active:scale-95">
-                                        <i class="fa-regular fa-star" id="bookmark-icon"></i>
-                                        <span id="bookmark-text">저장하기</span>
-                                    </button>
-                                </div>
-                            </div>
-
+                    <div id="card-touch-area" class="w-full min-h-[340px] bg-white dark:bg-slate-700/90 border-2 border-blue-100 dark:border-slate-600 rounded-2xl p-6 shadow-lg flex flex-col justify-between cursor-pointer card-anim select-none">
+                        
+                        <!-- Top Tag -->
+                        <div class="flex justify-between items-center">
+                            <span id="card-front-tag" class="text-xs font-bold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-slate-800 px-3 py-1 rounded-full border border-blue-100 dark:border-slate-600">
+                                카테고리
+                            </span>
+                            <span id="reveal-status-hint" class="text-[11px] text-gray-400 dark:text-gray-400">
+                                💡 터치하여 정답 확인
+                            </span>
                         </div>
+                        
+                        <!-- Korean Sentence (Main Always Visible) -->
+                        <div class="my-auto py-4 text-center">
+                            <h3 class="text-xl font-bold text-gray-800 dark:text-white leading-relaxed break-keep" id="card-front-ko">
+                                한국어 문장
+                            </h3>
+                        </div>
+
+                        <!-- Reveal Target: English & Explanation Section -->
+                        <div id="reveal-section" class="hidden border-t-2 border-dashed border-blue-100 dark:border-slate-600 pt-4 mt-2 text-center space-y-3 animate-fadeIn">
+                            <div>
+                                <span class="text-[10px] font-bold text-blue-500 uppercase tracking-wider block mb-1">English</span>
+                                <h4 class="text-lg font-bold text-blue-600 dark:text-blue-300 leading-snug break-words" id="card-back-en">
+                                    English Sentence
+                                </h4>
+                            </div>
+
+                            <p class="text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-slate-800 p-2.5 rounded-lg leading-normal break-keep" id="card-back-note">
+                                설명 및 참고사항
+                            </p>
+
+                            <!-- Independent Action Buttons (stopPropagation) -->
+                            <div class="flex space-x-3 w-full justify-center pt-2">
+                                <button onclick="event.stopPropagation(); speakText()" class="flex-1 max-w-[130px] bg-blue-50 dark:bg-slate-800 hover:bg-blue-100 text-blue-600 dark:text-blue-300 text-xs py-2 px-3 rounded-full font-bold flex items-center justify-center space-x-1.5 transition active:scale-95 border border-blue-200 dark:border-slate-600">
+                                    <i class="fa-solid fa-volume-high"></i>
+                                    <span>발음 듣기</span>
+                                </button>
+                                <button onclick="event.stopPropagation(); toggleBookmark()" id="btn-bookmark" class="flex-1 max-w-[130px] bg-blue-50 dark:bg-slate-800 hover:bg-blue-100 text-blue-600 dark:text-blue-300 text-xs py-2 px-3 rounded-full font-bold flex items-center justify-center space-x-1.5 transition active:scale-95 border border-blue-200 dark:border-slate-600">
+                                    <i class="fa-regular fa-star" id="bookmark-icon"></i>
+                                    <span id="bookmark-text">저장하기</span>
+                                </button>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 
@@ -196,10 +203,8 @@
     </div>
 
     <script>
-        // Google Sheet Configuration
         const SPREADSHEET_ID = '1_e-3kh0l1W07frstbcBDbd9KXRKJ0biGvr9gd5xFLHI';
         
-        // Recommended English Grammar Order & Categories
         const categories = {
             grammar: [
                 "문장의형식", "동사의유형", "동사의시제", "조동사", "능동태,수동태", "일치",
@@ -212,15 +217,14 @@
             ]
         };
 
-        // App State
         let currentTab = 'grammar';
         let currentSubTab = categories.grammar[0];
         let currentData = [];
         let cardIndex = 0;
-        let isFlipped = false;
+        let isRevealed = false;
+        let isAnimating = false;
         let bookmarks = JSON.parse(localStorage.getItem('myBookmarks')) || [];
 
-        // App Initialization
         window.onload = () => {
             initDarkMode();
             renderSubTabs();
@@ -252,7 +256,6 @@
         function setMainTab(tab) {
             currentTab = tab;
             
-            // Tab Header Styling Update
             document.getElementById('tab-grammar').className = `pb-1 border-b-2 ${tab === 'grammar' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
             document.getElementById('tab-conversation').className = `pb-1 border-b-2 ${tab === 'conversation' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
             document.getElementById('tab-bookmarks').className = `pb-1 border-b-2 ${tab === 'bookmarks' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
@@ -278,7 +281,6 @@
                 `<button onclick="changeSubTab('${cat}')" class="px-3 py-1.5 rounded-full text-xs font-semibold ${cat === currentSubTab ? 'bg-blue-600 text-white shadow' : 'bg-white dark:bg-slate-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-slate-600'} transition active:scale-95">${cat}</button>`
             ).join('');
             
-            // Scroll selected subtab into view
             const activeBtn = subTabsDiv.querySelector('.bg-blue-600');
             if(activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
         }
@@ -289,7 +291,7 @@
             loadSheetData(currentSubTab);
         }
 
-        /* --- Data Fetching (Google Sheets CSV) --- */
+        /* --- Data Fetching --- */
         async function loadSheetData(sheetName) {
             const listContainer = document.getElementById('list-container');
             listContainer.innerHTML = '<div class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p class="text-xs">데이터를 가져오는 중입니다...</p></div>';
@@ -307,7 +309,6 @@
             }
         }
 
-        // CSV Parser Handling Quotes & Line breaks
         function parseCSV(str) {
             const arr = [];
             let quote = false, row = [], col = "";
@@ -327,7 +328,6 @@
             if (col !== "") row.push(col.trim());
             if (row.length > 0) arr.push(row);
             
-            // Exclude Header Row
             if(arr.length > 0 && (arr[0][0].includes('한국어') || arr[0][0].includes('A열'))) {
                 arr.shift(); 
             }
@@ -341,7 +341,7 @@
             }).filter(item => item.ko !== '' || item.en !== '');
         }
 
-        /* --- List View Rendering --- */
+        /* --- List View Rendering (Clickable Item Cards) --- */
         function renderList(data, isBookmark = false) {
             currentData = data;
             const container = document.getElementById('list-container');
@@ -355,13 +355,13 @@
             container.innerHTML = data.map((item, index) => {
                 const isSaved = bookmarks.some(b => b.en === item.en);
                 return `
-                <div class="bg-white dark:bg-slate-700/60 border border-gray-100 dark:border-slate-600/60 rounded-xl p-3.5 shadow-sm relative transition hover:shadow-md">
+                <div onclick="startFlashcard(${index})" class="bg-white dark:bg-slate-700/60 border border-gray-100 dark:border-slate-600/60 rounded-xl p-3.5 shadow-sm relative transition hover:shadow-md cursor-pointer active:scale-[0.99]">
                     <div class="flex justify-between items-start gap-2 mb-1.5">
                         <div class="flex-1">
                             <span class="font-bold text-gray-800 dark:text-gray-100 text-sm leading-snug break-keep">${item.ko}</span>
                             ${item.form ? `<span class="ml-1.5 text-[10px] text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-600 px-1.5 py-0.5 rounded font-medium">${item.form}</span>` : ''}
                         </div>
-                        <button onclick="toggleListBookmark(${index})" class="text-gray-400 dark:text-gray-500 hover:text-amber-400 dark:hover:text-amber-300 p-1">
+                        <button onclick="event.stopPropagation(); toggleListBookmark(${index})" class="text-gray-400 dark:text-gray-500 hover:text-amber-400 dark:hover:text-amber-300 p-1">
                             <i class="${isSaved ? 'fa-solid text-amber-400 dark:text-amber-300' : 'fa-regular'} fa-star text-sm"></i>
                         </button>
                     </div>
@@ -383,20 +383,24 @@
             renderList(currentData, currentTab === 'bookmarks');
         }
 
-        /* --- Flashcard Logic & Persistence --- */
-        function startFlashcard() {
+        /* --- Flashcard Logic with Slide Animation --- */
+        function startFlashcard(targetIndex = null) {
             if(currentData.length === 0) return alert('학습할 데이터가 없습니다.');
             
             document.getElementById('list-view').classList.add('hidden');
             document.getElementById('flashcard-view').classList.remove('hidden');
             document.getElementById('flashcard-view').classList.add('flex');
             
-            // Resume progress from localStorage
-            const progressKey = `progress_${currentTab}_${currentSubTab}`;
-            const savedIndex = localStorage.getItem(progressKey);
-            cardIndex = savedIndex !== null ? parseInt(savedIndex) : 0;
+            if(targetIndex !== null) {
+                cardIndex = targetIndex;
+            } else {
+                const progressKey = `progress_${currentTab}_${currentSubTab}`;
+                const savedIndex = localStorage.getItem(progressKey);
+                cardIndex = savedIndex !== null ? parseInt(savedIndex) : 0;
+            }
             if(cardIndex >= currentData.length) cardIndex = 0;
 
+            isRevealed = false;
             updateCardUI();
         }
 
@@ -411,36 +415,72 @@
             if(confirm('진도를 처음으로 초기화하시겠습니까?')) {
                 cardIndex = 0;
                 saveProgress();
-                resetFlipAndUpdate();
+                isRevealed = false;
+                updateCardUI();
             }
         }
 
-        function flipCard() {
-            isFlipped = !isFlipped;
-            const card = document.getElementById('card-inner');
-            if(isFlipped) card.classList.add('is-flipped');
-            else card.classList.remove('is-flipped');
+        function toggleReveal() {
+            isRevealed = !isRevealed;
+            const revealSec = document.getElementById('reveal-section');
+            const hint = document.getElementById('reveal-status-hint');
+            
+            if(isRevealed) {
+                revealSec.classList.remove('hidden');
+                hint.innerText = '✅ 정답 표시됨';
+            } else {
+                revealSec.classList.add('hidden');
+                hint.innerText = '💡 터치하여 정답 확인';
+            }
         }
 
         function nextCard() {
+            if (isAnimating) return;
             if(cardIndex < currentData.length - 1) {
-                cardIndex++;
-                saveProgress();
-                resetFlipAndUpdate();
+                animateSlide('next', () => {
+                    cardIndex++;
+                    saveProgress();
+                });
             } else {
-                alert('마지막 카드입니다. 첫 카드부터 다시 학습할 수 있습니다.');
-                cardIndex = 0;
-                saveProgress();
-                resetFlipAndUpdate();
+                alert('마지막 카드입니다. 첫 카드부터 다시 학습합니다.');
+                animateSlide('next', () => {
+                    cardIndex = 0;
+                    saveProgress();
+                });
             }
         }
 
         function prevCard() {
+            if (isAnimating) return;
             if(cardIndex > 0) {
-                cardIndex--;
-                saveProgress();
-                resetFlipAndUpdate();
+                animateSlide('prev', () => {
+                    cardIndex--;
+                    saveProgress();
+                });
             }
+        }
+
+        function animateSlide(direction, updateIndexCallback) {
+            isAnimating = true;
+            const cardBox = document.getElementById('card-touch-area');
+            const slideOutClass = direction === 'next' ? 'slide-out-left' : 'slide-out-right';
+            const slideInClass = direction === 'next' ? 'slide-in-right' : 'slide-in-left';
+
+            cardBox.classList.add(slideOutClass);
+
+            setTimeout(() => {
+                updateIndexCallback();
+                isRevealed = false;
+                updateCardUI();
+
+                cardBox.classList.remove(slideOutClass);
+                cardBox.classList.add(slideInClass);
+
+                setTimeout(() => {
+                    cardBox.classList.remove(slideInClass);
+                    isAnimating = false;
+                }, 50);
+            }, 200);
         }
 
         function saveProgress() {
@@ -449,31 +489,32 @@
             }
         }
 
-        function resetFlipAndUpdate() {
-            isFlipped = false;
-            document.getElementById('card-inner').classList.remove('is-flipped');
-            setTimeout(updateCardUI, 200);
-        }
-
         function updateCardUI() {
             const item = currentData[cardIndex];
             document.getElementById('card-counter').innerText = `${cardIndex + 1} / ${currentData.length}`;
             
-            // Front Card Setup
             document.getElementById('card-front-tag').innerText = item.form || item.category || currentSubTab;
             document.getElementById('card-front-ko').innerText = item.ko;
             
-            // Back Card Setup
             document.getElementById('card-back-en').innerText = item.en;
             document.getElementById('card-back-note').innerText = item.note || '설명 및 참고사항이 없습니다.';
 
-            // Bookmark State
+            const revealSec = document.getElementById('reveal-section');
+            const hint = document.getElementById('reveal-status-hint');
+            if(isRevealed) {
+                revealSec.classList.remove('hidden');
+                hint.innerText = '✅ 정답 표시됨';
+            } else {
+                revealSec.classList.add('hidden');
+                hint.innerText = '💡 터치하여 정답 확인';
+            }
+
             const isSaved = bookmarks.some(b => b.en === item.en);
             const bookmarkIcon = document.getElementById('bookmark-icon');
             const bookmarkText = document.getElementById('bookmark-text');
             
             if(isSaved) {
-                bookmarkIcon.className = 'fa-solid fa-star text-amber-300';
+                bookmarkIcon.className = 'fa-solid fa-star text-amber-400';
                 bookmarkText.innerText = '저장됨';
             } else {
                 bookmarkIcon.className = 'fa-regular fa-star';
@@ -494,14 +535,13 @@
             updateCardUI();
         }
 
-        /* --- TTS Voice Feature --- */
         function speakText() {
             const text = currentData[cardIndex].en;
             if('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); // Stop any active speech
+                window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'en-US';
-                utterance.rate = 0.85; // Slightly slower for clear learning
+                utterance.rate = 0.85;
                 window.speechSynthesis.speak(utterance);
             } else {
                 alert('이 브라우저는 원어민 음성 듣기를 지원하지 않습니다.');
@@ -531,21 +571,20 @@
                 const diffX = endX - startX;
                 const diffY = endY - startY;
 
-                // Horizontal Swipe threshold (50px) & check vertical movement wasn't primary
                 if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
                     if (diffX < 0) {
-                        nextCard(); // Swipe Left -> Next
+                        nextCard();
                     } else {
-                        prevCard(); // Swipe Right -> Prev
+                        prevCard();
                     }
                 } else if (Math.abs(diffX) < 10 && Math.abs(diffY) < 10) {
-                    flipCard(); // Small motion counts as Tap to flip
+                    toggleReveal();
                 }
             }
         }
-    </script> <!-- 👈 이 부분이 빠져있었습니다! 반드시 추가해 주세요. -->
+    </script>
 
-    <!-- 👇 여기서부터 Service Worker 스크립트 시작 -->
+    <!-- Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
