@@ -69,7 +69,6 @@
             <div class="flex justify-around text-xs sm:text-sm font-semibold border-t border-blue-500/30 dark:border-slate-700 pt-2">
                 <button onclick="setMainTab('grammar')" id="tab-grammar" class="pb-1 border-b-2 border-white">문법 파트</button>
                 <button onclick="setMainTab('conversation')" id="tab-conversation" class="pb-1 border-b-2 border-transparent opacity-70">회화 파트</button>
-                <button onclick="setMainTab('words')" id="tab-words" class="pb-1 border-b-2 border-transparent opacity-70">단어 파트</button>
                 <button onclick="setMainTab('bookmarks')" id="tab-bookmarks" class="pb-1 border-b-2 border-transparent opacity-70">⭐ 복습장</button>
             </div>
         </header>
@@ -127,7 +126,7 @@
                     
                     <div id="card-touch-area" class="w-full min-h-[340px] bg-white dark:bg-slate-700/90 border-2 border-blue-100 dark:border-slate-600 rounded-2xl p-6 shadow-lg flex flex-col justify-between cursor-grab active:cursor-grabbing">
                         
-                        <!-- 1. 터치/스와이프 반응 본문 영역 (한국어, 태그, 영어, 설명) -->
+                        <!-- 1. 터치/스와이프 반응 본문 영역 -->
                         <div id="card-content-body" class="flex-1 flex flex-col justify-between">
                             <!-- Top Tag -->
                             <div class="flex justify-between items-center">
@@ -206,11 +205,12 @@
             ],
             conversation: [
                 "회화(공항에서)", "회화(택시에서)", "회화(식당에서)", "회화(영행지에서)", "회화(대중교통)", "회화(길찾기)"
-            ],
-            words: ["매일 단어장"]
+            ]
         };
 
         let currentTab = localStorage.getItem('app_last_tab') || 'grammar';
+        if (currentTab === 'words') currentTab = 'grammar'; // 단어 탭이 마지막이었던 경우 문법으로 기본 변경
+
         let currentSubTab = localStorage.getItem('app_last_subtab') || categories.grammar[0];
         let currentView = localStorage.getItem('app_last_view') || 'list';
         
@@ -231,11 +231,8 @@
                 if (currentView === 'flashcard' && bookmarks.length > 0) {
                     startFlashcard(getSavedCardIndex());
                 }
-            } else if (currentTab === 'words') {
-                document.getElementById('sub-tabs-container').classList.add('hidden');
-                currentSubTab = '단어';
-                loadSheetData('단어', true);
             } else {
+                if (!categories[currentTab]) currentTab = 'grammar';
                 renderSubTabs();
                 loadSheetData(currentSubTab, true);
             }
@@ -267,7 +264,6 @@
         function updateTabHeaderUI() {
             document.getElementById('tab-grammar').className = `pb-1 border-b-2 ${currentTab === 'grammar' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
             document.getElementById('tab-conversation').className = `pb-1 border-b-2 ${currentTab === 'conversation' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
-            document.getElementById('tab-words').className = `pb-1 border-b-2 ${currentTab === 'words' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
             document.getElementById('tab-bookmarks').className = `pb-1 border-b-2 ${currentTab === 'bookmarks' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
         }
 
@@ -283,11 +279,6 @@
                 subNav.classList.add('hidden');
                 document.getElementById('current-category-title').innerText = '복습장 (저장된 예문)';
                 renderList(bookmarks, true);
-            } else if (tab === 'words') {
-                subNav.classList.add('hidden');
-                currentSubTab = '단어';
-                localStorage.setItem('app_last_subtab', '단어');
-                loadSheetData('단어');
             } else {
                 subNav.classList.remove('hidden');
                 const savedSub = localStorage.getItem(`app_last_subtab_${tab}`);
@@ -319,27 +310,26 @@
 
         /* --- Data Fetching --- */
         async function loadSheetData(sheetName, isInitialLoad = false) {
-    const listContainer = document.getElementById('list-container');
-    listContainer.innerHTML = '<div class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p class="text-xs">데이터를 가져오는 중입니다...</p></div>';
-    document.getElementById('current-category-title').innerText = sheetName === '단어' ? '매일 자동 생성 단어장' : sheetName;
-    
-    // 캐시 방지를 위해 타임스탬프 파라미터 추가
-    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&_t=${Date.now()}`;
-    
-    try {
-        const response = await fetch(url);
-        const csvText = await response.text();
-        currentData = parseCSV(csvText);
-        
-        renderList(currentData);
+            const listContainer = document.getElementById('list-container');
+            listContainer.innerHTML = '<div class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p class="text-xs">데이터를 가져오는 중입니다...</p></div>';
+            document.getElementById('current-category-title').innerText = sheetName;
+            
+            const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&_t=${Date.now()}`;
+            
+            try {
+                const response = await fetch(url);
+                const csvText = await response.text();
+                currentData = parseCSV(csvText);
+                
+                renderList(currentData);
 
-        if (isInitialLoad && currentView === 'flashcard' && currentData.length > 0) {
-            startFlashcard(getSavedCardIndex());
+                if (isInitialLoad && currentView === 'flashcard' && currentData.length > 0) {
+                    startFlashcard(getSavedCardIndex());
+                }
+            } catch (error) {
+                listContainer.innerHTML = '<div class="text-center py-10 text-red-500 text-xs px-4"><i class="fa-solid fa-triangle-exclamation text-xl mb-2"></i><p>시트 데이터를 가져오지 못했습니다. 구글시트의 공유 설정을 확인해 주세요.</p></div>';
+            }
         }
-    } catch (error) {
-        listContainer.innerHTML = '<div class="text-center py-10 text-red-500 text-xs px-4"><i class="fa-solid fa-triangle-exclamation text-xl mb-2"></i><p>시트 데이터를 가져오지 못했습니다. 구글시트의 공유 설정("링크가 있는 모든 사용자 읽기 가능")을 확인해 주세요.</p></div>';
-    }
-}
 
         function parseCSV(str) {
             const arr = [];
@@ -365,8 +355,8 @@
             }
 
             return arr.map(row => {
-                if(currentTab === 'grammar' || currentTab === 'words') {
-                    return { ko: row[0] || '', form: row[1] || '', en: row[2] || '', note: row[3] || '', category: currentTab === 'words' ? '단어' : currentSubTab };
+                if(currentTab === 'grammar') {
+                    return { ko: row[0] || '', form: row[1] || '', en: row[2] || '', note: row[3] || '', category: currentSubTab };
                 } else {
                     return { ko: row[0] || '', form: '', en: row[1] || '', note: row[2] || '', category: currentSubTab };
                 }
@@ -377,7 +367,7 @@
         function renderList(data, isBookmark = false) {
             currentData = data;
             const container = document.getElementById('list-container');
-            document.getElementById('item-count-label').innerText = `${data.length}개의 예문/단어`;
+            document.getElementById('item-count-label').innerText = `${data.length}개의 예문`;
 
             if(data.length === 0) {
                 container.innerHTML = `<div class="text-center text-gray-400 py-16 text-xs"><i class="fa-regular fa-folder-open text-3xl mb-2"></i><p>${isBookmark ? '저장된 복습 카드가 없습니다.' : '등록된 예문이 없습니다.'}</p></div>`;
