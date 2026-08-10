@@ -44,25 +44,9 @@
         * { -ms-overflow-style: none; scrollbar-width: none; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
         
-        /* Slide Animation for Flashcard Swipe */
-        .card-anim {
-            transition: transform 0.25s ease-out, opacity 0.25s ease-out;
-        }
-        .slide-out-left {
-            transform: translateX(-100%) scale(0.95);
-            opacity: 0;
-        }
-        .slide-out-right {
-            transform: translateX(100%) scale(0.95);
-            opacity: 0;
-        }
-        .slide-in-left {
-            transform: translateX(-100%) scale(0.95);
-            opacity: 0;
-        }
-        .slide-in-right {
-            transform: translateX(100%) scale(0.95);
-            opacity: 0;
+        /* Card Transform Transition for Snap-back & Animations */
+        .card-anim-ready {
+            transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease-out;
         }
     </style>
 </head>
@@ -133,32 +117,35 @@
                 </div>
 
                 <!-- Card Container (Touch to Reveal / Swipe Slide) -->
-                <div class="flex-1 flex flex-col justify-center my-auto relative overflow-hidden p-1">
+                <div class="flex-1 flex flex-col justify-center my-auto relative overflow-hidden p-1 select-none">
                     <p class="text-center text-xs text-gray-400 dark:text-gray-500 mb-2">
-                        <i class="fa-solid fa-hand-pointer mr-1"></i>터치하여 정답 열기 | <i class="fa-solid fa-arrows-left-right mr-1"></i>좌우로 스와이프
+                        <i class="fa-solid fa-hand-pointer mr-1"></i>상단 영역 터치하여 정답 열기 | <i class="fa-solid fa-arrows-left-right mr-1"></i>좌우 드래그 스와이프
                     </p>
                     
-                    <div id="card-touch-area" class="w-full min-h-[340px] bg-white dark:bg-slate-700/90 border-2 border-blue-100 dark:border-slate-600 rounded-2xl p-6 shadow-lg flex flex-col justify-between cursor-pointer card-anim select-none">
+                    <div id="card-touch-area" class="w-full min-h-[340px] bg-white dark:bg-slate-700/90 border-2 border-blue-100 dark:border-slate-600 rounded-2xl p-6 shadow-lg flex flex-col justify-between cursor-pointer card-anim-ready">
                         
-                        <!-- Top Tag -->
-                        <div class="flex justify-between items-center">
-                            <span id="card-front-tag" class="text-xs font-bold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-slate-800 px-3 py-1 rounded-full border border-blue-100 dark:border-slate-600">
-                                카테고리
-                            </span>
-                            <span id="reveal-status-hint" class="text-[11px] text-gray-400 dark:text-gray-400">
-                                💡 터치하여 정답 확인
-                            </span>
-                        </div>
-                        
-                        <!-- Korean Sentence (Main Always Visible) -->
-                        <div class="my-auto py-4 text-center">
-                            <h3 class="text-xl font-bold text-gray-800 dark:text-white leading-relaxed break-keep" id="card-front-ko">
-                                한국어 문장
-                            </h3>
+                        <!-- Top Area (Touch Area for Toggle) -->
+                        <div class="flex-1 flex flex-col justify-between" id="card-top-section">
+                            <!-- Top Tag -->
+                            <div class="flex justify-between items-center">
+                                <span id="card-front-tag" class="text-xs font-bold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-slate-800 px-3 py-1 rounded-full border border-blue-100 dark:border-slate-600">
+                                    카테고리
+                                </span>
+                                <span id="reveal-status-hint" class="text-[11px] text-gray-400 dark:text-gray-400">
+                                    💡 터치하여 정답 확인
+                                </span>
+                            </div>
+                            
+                            <!-- Korean Sentence -->
+                            <div class="my-auto py-6 text-center">
+                                <h3 class="text-xl font-bold text-gray-800 dark:text-white leading-relaxed break-keep" id="card-front-ko">
+                                    한국어 문장
+                                </h3>
+                            </div>
                         </div>
 
-                        <!-- Reveal Target: English & Explanation Section -->
-                        <div id="reveal-section" class="hidden border-t-2 border-dashed border-blue-100 dark:border-slate-600 pt-4 mt-2 text-center space-y-3 animate-fadeIn">
+                        <!-- Reveal Target: English & Explanation Section (Excluded from Touch Reveal Toggle) -->
+                        <div id="reveal-section" class="hidden border-t-2 border-dashed border-blue-100 dark:border-slate-600 pt-4 mt-2 text-center space-y-3">
                             <div>
                                 <span class="text-[10px] font-bold text-blue-500 uppercase tracking-wider block mb-1">English</span>
                                 <h4 class="text-lg font-bold text-blue-600 dark:text-blue-300 leading-snug break-words" id="card-back-en">
@@ -217,8 +204,11 @@
             ]
         };
 
-        let currentTab = 'grammar';
-        let currentSubTab = categories.grammar[0];
+        // 앱 상태 변수 (상태 복원을 위해 로컬스토리지 연동)
+        let currentTab = localStorage.getItem('app_last_tab') || 'grammar';
+        let currentSubTab = localStorage.getItem('app_last_subtab') || categories.grammar[0];
+        let currentView = localStorage.getItem('app_last_view') || 'list'; // 'list' | 'flashcard'
+        
         let currentData = [];
         let cardIndex = 0;
         let isRevealed = false;
@@ -227,8 +217,22 @@
 
         window.onload = () => {
             initDarkMode();
-            renderSubTabs();
-            loadSheetData(currentSubTab);
+            
+            // 저장된 탭 상태 반영 UI 세팅
+            updateTabHeaderUI();
+            
+            if (currentTab === 'bookmarks') {
+                document.getElementById('sub-tabs-container').classList.add('hidden');
+                document.getElementById('current-category-title').innerText = '복습장 (저장된 예문)';
+                renderList(bookmarks, true);
+                if (currentView === 'flashcard' && bookmarks.length > 0) {
+                    startFlashcard(getSavedCardIndex());
+                }
+            } else {
+                renderSubTabs();
+                loadSheetData(currentSubTab, true);
+            }
+
             setupSwipeEvents();
         };
 
@@ -253,12 +257,16 @@
         }
 
         /* --- Navigation & Tabs Logic --- */
+        function updateTabHeaderUI() {
+            document.getElementById('tab-grammar').className = `pb-1 border-b-2 ${currentTab === 'grammar' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
+            document.getElementById('tab-conversation').className = `pb-1 border-b-2 ${currentTab === 'conversation' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
+            document.getElementById('tab-bookmarks').className = `pb-1 border-b-2 ${currentTab === 'bookmarks' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
+        }
+
         function setMainTab(tab) {
             currentTab = tab;
-            
-            document.getElementById('tab-grammar').className = `pb-1 border-b-2 ${tab === 'grammar' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
-            document.getElementById('tab-conversation').className = `pb-1 border-b-2 ${tab === 'conversation' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
-            document.getElementById('tab-bookmarks').className = `pb-1 border-b-2 ${tab === 'bookmarks' ? 'border-white opacity-100' : 'border-transparent opacity-70'}`;
+            localStorage.setItem('app_last_tab', tab);
+            updateTabHeaderUI();
             
             stopFlashcard();
             
@@ -269,7 +277,9 @@
                 renderList(bookmarks, true);
             } else {
                 subNav.classList.remove('hidden');
-                currentSubTab = categories[tab][0];
+                const savedSub = localStorage.getItem(`app_last_subtab_${tab}`);
+                currentSubTab = (savedSub && categories[tab].includes(savedSub)) ? savedSub : categories[tab][0];
+                localStorage.setItem('app_last_subtab', currentSubTab);
                 renderSubTabs();
                 loadSheetData(currentSubTab);
             }
@@ -287,12 +297,15 @@
 
         function changeSubTab(cat) {
             currentSubTab = cat;
+            localStorage.setItem('app_last_subtab', cat);
+            localStorage.setItem(`app_last_subtab_${currentTab}`, cat);
             renderSubTabs();
+            stopFlashcard();
             loadSheetData(currentSubTab);
         }
 
         /* --- Data Fetching --- */
-        async function loadSheetData(sheetName) {
+        async function loadSheetData(sheetName, isInitialLoad = false) {
             const listContainer = document.getElementById('list-container');
             listContainer.innerHTML = '<div class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p class="text-xs">데이터를 가져오는 중입니다...</p></div>';
             document.getElementById('current-category-title').innerText = sheetName;
@@ -303,7 +316,13 @@
                 const response = await fetch(url);
                 const csvText = await response.text();
                 currentData = parseCSV(csvText);
+                
                 renderList(currentData);
+
+                // 새로고침 시 이전에 플래시카드 화면이었다면 해당 위치로 카드뷰 복원
+                if (isInitialLoad && currentView === 'flashcard' && currentData.length > 0) {
+                    startFlashcard(getSavedCardIndex());
+                }
             } catch (error) {
                 listContainer.innerHTML = '<div class="text-center py-10 text-red-500 text-xs px-4"><i class="fa-solid fa-triangle-exclamation text-xl mb-2"></i><p>시트 데이터를 가져오지 못했습니다. 구글시트의 공유 설정("링크가 있는 모든 사용자 읽기 가능")을 확인해 주세요.</p></div>';
             }
@@ -383,10 +402,25 @@
             renderList(currentData, currentTab === 'bookmarks');
         }
 
+        /* --- Flashcard Progress Persistence Helpers --- */
+        function saveProgress() {
+            const progressKey = `progress_${currentTab}_${currentSubTab}`;
+            localStorage.setItem(progressKey, cardIndex);
+        }
+
+        function getSavedCardIndex() {
+            const progressKey = `progress_${currentTab}_${currentSubTab}`;
+            const savedIndex = localStorage.getItem(progressKey);
+            return savedIndex !== null ? parseInt(savedIndex, 10) : 0;
+        }
+
         /* --- Flashcard Logic --- */
         function startFlashcard(targetIndex = null) {
             if(currentData.length === 0) return alert('학습할 데이터가 없습니다.');
             
+            currentView = 'flashcard';
+            localStorage.setItem('app_last_view', 'flashcard');
+
             document.getElementById('list-view').classList.add('hidden');
             document.getElementById('flashcard-view').classList.remove('hidden');
             document.getElementById('flashcard-view').classList.add('flex');
@@ -394,17 +428,19 @@
             if(targetIndex !== null) {
                 cardIndex = targetIndex;
             } else {
-                const progressKey = `progress_${currentTab}_${currentSubTab}`;
-                const savedIndex = localStorage.getItem(progressKey);
-                cardIndex = savedIndex !== null ? parseInt(savedIndex) : 0;
+                cardIndex = getSavedCardIndex();
             }
             if(cardIndex >= currentData.length) cardIndex = 0;
 
             isRevealed = false;
             updateCardUI();
+            saveProgress();
         }
 
         function stopFlashcard() {
+            currentView = 'list';
+            localStorage.setItem('app_last_view', 'list');
+
             document.getElementById('list-view').classList.remove('hidden');
             document.getElementById('flashcard-view').classList.add('hidden');
             document.getElementById('flashcard-view').classList.remove('flex');
@@ -437,60 +473,30 @@
         function nextCard() {
             if (isAnimating) return;
             if(cardIndex < currentData.length - 1) {
-                animateSlide('next', () => {
-                    cardIndex++;
-                    saveProgress();
-                });
+                cardIndex++;
             } else {
                 alert('마지막 카드입니다. 첫 카드부터 다시 학습합니다.');
-                animateSlide('next', () => {
-                    cardIndex = 0;
-                    saveProgress();
-                });
+                cardIndex = 0;
             }
+            saveProgress();
+            isRevealed = false;
+            updateCardUI();
         }
 
         function prevCard() {
             if (isAnimating) return;
             if(cardIndex > 0) {
-                animateSlide('prev', () => {
-                    cardIndex--;
-                    saveProgress();
-                });
-            }
-        }
-
-        function animateSlide(direction, updateIndexCallback) {
-            isAnimating = true;
-            const cardBox = document.getElementById('card-touch-area');
-            const slideOutClass = direction === 'next' ? 'slide-out-left' : 'slide-out-right';
-            const slideInClass = direction === 'next' ? 'slide-in-right' : 'slide-in-left';
-
-            cardBox.classList.add(slideOutClass);
-
-            setTimeout(() => {
-                updateIndexCallback();
+                cardIndex--;
+                saveProgress();
                 isRevealed = false;
                 updateCardUI();
-
-                cardBox.classList.remove(slideOutClass);
-                cardBox.classList.add(slideInClass);
-
-                setTimeout(() => {
-                    cardBox.classList.remove(slideInClass);
-                    isAnimating = false;
-                }, 50);
-            }, 200);
-        }
-
-        function saveProgress() {
-            if(currentTab !== 'bookmarks') {
-                localStorage.setItem(`progress_${currentTab}_${currentSubTab}`, cardIndex);
             }
         }
 
         function updateCardUI() {
             const item = currentData[cardIndex];
+            if (!item) return;
+
             document.getElementById('card-counter').innerText = `${cardIndex + 1} / ${currentData.length}`;
             
             document.getElementById('card-front-tag').innerText = item.form || item.category || currentSubTab;
@@ -548,46 +554,103 @@
             }
         }
 
-        /* --- Touch Swipe Gesture Recognition (Button Filter Added) --- */
+        /* --- Real-Time Touch Drag & Gesture (Strict #reveal-section Exclusion) --- */
         function setupSwipeEvents() {
-            const touchArea = document.getElementById('card-touch-area');
+            const cardBox = document.getElementById('card-touch-area');
             let startX = 0;
             let startY = 0;
-            let endX = 0;
-            let endY = 0;
-            let ignoreTouch = false;
+            let deltaX = 0;
+            let deltaY = 0;
+            let isDragging = false;
 
-            touchArea.addEventListener('touchstart', (e) => {
-                // 버튼 요소를 터치한 경우 스와이프 및 정답 펼치기 이벤트 무시
-                if (e.target.closest('button')) {
-                    ignoreTouch = true;
+            // 터치 시작
+            cardBox.addEventListener('touchstart', (e) => {
+                if (isAnimating) return;
+
+                // 버튼이나 #reveal-section 내부를 터치한 경우 터치/드래그 무시
+                if (e.target.closest('#reveal-section') || e.target.closest('button')) {
+                    isDragging = false;
                     return;
                 }
-                ignoreTouch = false;
-                startX = e.changedTouches[0].screenX;
-                startY = e.changedTouches[0].screenY;
+
+                isDragging = true;
+                const touch = e.touches[0];
+                startX = touch.clientX;
+                startY = touch.clientY;
+                deltaX = 0;
+                deltaY = 0;
+
+                // 드래그 중 실시간 추적을 위해 트랜지션 해제
+                cardBox.style.transition = 'none';
             }, { passive: true });
 
-            touchArea.addEventListener('touchend', (e) => {
-                if (ignoreTouch || e.target.closest('button')) return;
-                endX = e.changedTouches[0].screenX;
-                endY = e.changedTouches[0].screenY;
-                handleGesture();
+            // 손가락 이동 (실시간 추적)
+            cardBox.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+
+                const touch = e.touches[0];
+                deltaX = touch.clientX - startX;
+                deltaY = touch.clientY - startY;
+
+                // 실시간 위치 이동 및 기울기(Rotate) 효과
+                const rotate = deltaX * 0.05; // 픽셀당 약 0.05도 회전
+                cardBox.style.transform = `translate3d(${deltaX}px, ${deltaY * 0.15}px, 0) rotate(${rotate}deg)`;
             }, { passive: true });
 
-            function handleGesture() {
-                const diffX = endX - startX;
-                const diffY = endY - startY;
+            // 터치 종료 (스와이프 / 탄력 복원 / 정답 열기 판정)
+            cardBox.addEventListener('touchend', (e) => {
+                if (!isDragging) return;
+                isDragging = false;
 
-                if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
-                    if (diffX < 0) {
-                        nextCard();
-                    } else {
-                        prevCard();
-                    }
-                } else if (Math.abs(diffX) < 10 && Math.abs(diffY) < 10) {
+                // 탄력 복원 애니메이션 준비
+                cardBox.style.transition = 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease-out';
+
+                const SWIPE_THRESHOLD = 80;
+
+                // 1. 단순 터치(클릭)인 경우: 상단 영역 터치 시에만 정답 토글
+                if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
+                    cardBox.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
                     toggleReveal();
+                    return;
                 }
+
+                // 2. 일정 거리(80px) 이상 스와이프한 경우
+                if (deltaX < -SWIPE_THRESHOLD) {
+                    // 왼쪽으로 끌기 (다음 카드)
+                    isAnimating = true;
+                    cardBox.style.transform = `translate3d(-120%, ${deltaY}px, 0) rotate(-15deg)`;
+                    cardBox.style.opacity = '0';
+
+                    setTimeout(() => {
+                        nextCard();
+                        resetCardPosition(cardBox);
+                    }, 200);
+
+                } else if (deltaX > SWIPE_THRESHOLD) {
+                    // 오른쪽으로 끌기 (이전 카드)
+                    isAnimating = true;
+                    cardBox.style.transform = `translate3d(120%, ${deltaY}px, 0) rotate(15deg)`;
+                    cardBox.style.opacity = '0';
+
+                    setTimeout(() => {
+                        prevCard();
+                        resetCardPosition(cardBox);
+                    }, 200);
+
+                } else {
+                    // 3. 80px 미만으로 살짝 밀었을 때: 제자리로 탄력 복원 (Snap-back)
+                    cardBox.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
+                }
+            });
+
+            function resetCardPosition(element) {
+                element.style.transition = 'none';
+                element.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
+                element.style.opacity = '1';
+                setTimeout(() => {
+                    element.style.transition = 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease-out';
+                    isAnimating = false;
+                }, 50);
             }
         }
     </script>
